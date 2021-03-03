@@ -1,0 +1,2 @@
+# exercicesSQL
+Différents exercices
