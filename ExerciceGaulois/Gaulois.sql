@@ -69,7 +69,7 @@ ORDER BY nbCasque DESC
 
 SELECT v.NOM, b.NOM_BATAILLE, SUM(pc.QTE) AS nbCasque
 FROM villageois v, bataille b, prise_casque pc
-WHERE pc.ID_VILLAGEOIS = v.ID_VILLAGEOISAND 
+WHERE pc.ID_VILLAGEOIS = v.ID_VILLAGEOIS
 AND pc.ID_BATAILLE = b.ID_BATAILLE
 GROUP BY v.NOM, b.NOM_BATAILLE
 HAVING nbcasque = (SELECT MAX(sc.nbCasque)
@@ -79,7 +79,7 @@ HAVING nbcasque = (SELECT MAX(sc.nbCasque)
 -- sans vue ( plus complexe )
 SELECT v.NOM, SUM(pc.QTE) AS total
 FROM villageois v, bataille b, prise_casque pc
-WHERE pc.ID_VILLAGEOIS = v.ID_VILLAGEOISAND 
+WHERE pc.ID_VILLAGEOIS = v.ID_VILLAGEOIS 
 AND pc.ID_BATAILLE = b.ID_BATAILLE
 GROUP BY v.NOM
 HAVING total >= ALL (SELECT SUM(QTE)
@@ -91,10 +91,11 @@ HAVING total >= ALL (SELECT SUM(QTE)
 -- 8) Nom des villageois et la quantité de potion bue (en les classant du plus grand buveur au plus
 -- petit)
 
-SELECT NOM, DOSE
+SELECT NOM, SUM(DOSE)
 FROM boit b, villageois v
 WHERE b.ID_VILLAGEOIS = v.ID_VILLAGEOIS
-ORDER BY DOSE DESC
+GROUP BY NOM
+ORDER BY SUM(DOSE) DESC
 
 
 -- 9) Nom de la bataille où le nombre de casques pris a été le plus important
@@ -114,13 +115,11 @@ WHERE tc.totale = ( SELECT MAX(tc.totale)
 -- 10) Combien existe-t-il de casques de chaque type et quel est leur coût total ? (classés par nombre
 -- décroissant)
 
-SELECT NOM_TYPE_CASQUE, COUNT(c.ID_TYPE_CASQUE), SUM(COUT_CASQUE)
+SELECT NOM_TYPE_CASQUE, COUNT(c.ID_TYPE_CASQUE) AS Total_type_casque, SUM(COUT_CASQUE) AS Total_cout
 FROM type_casque tc, casque c
 WHERE c.ID_TYPE_CASQUE = tc.ID_TYPE_CASQUE
 GROUP BY NOM_TYPE_CASQUE
-
-
-
+ORDER BY Total_type_casque DESC
 
 -- 11) Noms des potions dont un des ingrédients est la cerise
 
@@ -133,44 +132,52 @@ AND NOM_INGREDIENT = 'cerise'
 
 -- 12) Nom du / des village(s) possédant le plus d'habitants
 
+        --  avec "all"
+SELECT l.NOM_LIEU, COUNT(v.ID_LIEU) AS nb_habitants
+FROM villageois v, lieu l
+WHERE v.ID_LIEU = l.ID_LIEU
+GROUP BY NOM_LIEU
+HAVING nb_habitants >= ALL ( SELECT COUNT(v.ID_LIEU)
+									  FROM villageois v, lieu l
+									  WHERE v.ID_LIEU = l.ID_LIEU
+									  GROUP BY v.ID_LIEU)
+
+
+
+    --    avec la vue
 CREATE VIEW Population AS
 SELECT NOM_LIEU, COUNT(ID_VILLAGEOIS) AS TOTAL_HABITANT
 FROM lieu l, villageois v
 WHERE l.ID_LIEU=v.ID_LIEU
 GROUP BY NOM_LIEU
 
-SELECT NOM_LIEU, MAX(TOTAL_HABITANT)
-FROM population
--- M'affiche "3e chene a droite de la carriere" au lieu du village.... alors que quand je
---trie mon TOTAL-HABITANT en DESC, la première valeur est bien le " Village gaulois"....
-
+SELECT NOM_LIEU, COUNT(ID_VILLAGEOIS) AS TOTAL_HABITANT
+FROM lieu l, villageois v
+WHERE l.ID_LIEU=v.ID_LIEU
+GROUP BY NOM_LIEU
+HAVING TOTAL_HABITANT = ( SELECT MAX(TOTAL_HABITANT)
+									FROM population)
 
 
 -- 13) Noms des villageois qui n'ont jamais bu de potion
 
-SELECT DISTINCT ID_VILLAGEOIS, NOM
+SELECT v.NOM
+FROM villageois v
+WHERE v.ID_VILLAGEOIS NOT IN (SELECT b.ID_VILLAGEOIS 
+										FROM boit b)
+
+-- avec les "JOIN"
+SELECT DISTINCT v.NOM
 FROM villageois 
 LEFT JOIN boit b USING(ID_VILLAGEOIS)
 WHERE b.ID_VILLAGEOIS IS NULL
 
 
--- SELECT DISTINCT v.ID_VILLAGEOIS, NOM
--- FROM villageois v
--- WHERE v.ID_VILLAGEOIS IN (
--- 	SELECT DISTINCT b.ID_VILLAGEOIS
--- 	FROM boit b)
-
--- affiche liste des villageois ayant bu de la potion
-
-
--- pas moyen de faire une sous requête ? vu que "except" et "minus" marchent pas
-
-
 -- 14) Noms des villages qui contiennent la particule 'um'
 
-SELECT NOM
-FROM villageois 
-WHERE NOM LIKE '%um%'
+SELECT NOM_LIEU
+FROM lieu l
+WHERE l.NOM_LIEU LIKE '%um%'
 
 
 
@@ -183,4 +190,4 @@ FROM potion p, peut pe, villageois v
 WHERE v.ID_VILLAGEOIS=pe.ID_VILLAGEOIS
 AND pe.ID_POTION=p.ID_POTION
 AND NOM_POTION= 'Rajeunissement II'
-AND A_LE_DROIT = 0
+AND A_LE_DROIT = FALSE
